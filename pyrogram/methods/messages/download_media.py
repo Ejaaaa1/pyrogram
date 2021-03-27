@@ -20,7 +20,7 @@ import asyncio
 import os
 import time
 from datetime import datetime
-from typing import Union, Optional
+from typing import Union, Optional, AsyncGenerator
 
 from pyrogram import types
 from pyrogram.file_id import FileId, FileType, PHOTO_TYPES
@@ -164,3 +164,95 @@ class DownloadMedia(Scaffold):
             return await downloader
         else:
             asyncio.get_event_loop().create_task(downloader)
+
+    async def stream_media(
+        self,
+        message: Union["types.Message", str],
+        progress: callable = None,
+        progress_args: tuple = ()
+    ) -> Optional[AsyncGenerator]:
+        """Stream the media from a message.
+
+        Parameters:
+            message (:obj:`~pyrogram.types.Message` | ``str``):
+                Pass a Message containing the media, the media itself (message.audio, message.video, ...) or a file id
+                as string.
+
+            progress (``callable``, *optional*):
+                Pass a callback function to view the file transmission progress.
+                The function must take *(current, total)* as positional arguments (look at Other Parameters below for a
+                detailed description) and will be called back each time a new file chunk has been successfully
+                transmitted.
+
+            progress_args (``tuple``, *optional*):
+                Extra custom arguments for the progress callback function.
+                You can pass anything you need to be available in the progress callback scope; for example, a Message
+                object or a Client instance in order to edit the message with the updated progress status.
+
+        Other Parameters:
+            current (``int``):
+                The amount of bytes transmitted so far.
+
+            total (``int``):
+                The total size of the file.
+
+            *args (``tuple``, *optional*):
+                Extra custom arguments as defined in the ``progress_args`` parameter.
+                You can either keep ``*args`` or add every single extra argument in your function signature.
+
+        Returns:
+            ``async_generator``: In case the download failed or was deliberately stopped with :meth:`~pyrogram.Client.stop_transmission`, None is
+            returned.
+
+        Raises:
+            ValueError: if the message doesn't contain any downloadable media
+
+        Example:
+            .. code-block:: python
+
+                # Stream from Message
+                media_streaming = app.stream_media(message)
+
+                async for media_bytes in media_streaming:
+                    print(f"New bytes received: {media_bytes}")
+
+                # Stream from file id
+                media_streaming = app.stream_media("CAADBAADzg4AAvLQYAEz_x2EOgdRwBYE")
+
+                async for media_bytes in media_streaming:
+                    print(f"New bytes received: {media_bytes}")
+
+                # Keep track of the progress while downloading
+                def progress(current, total):
+                    print(f"{current * 100 / total:.1f}%")
+
+                media_streaming = app.stream_media(message, progress=progress)
+
+                async for media_bytes in media_streaming:
+                    print(f"New bytes received: {media_bytes}")
+        """
+        available_media = ("audio", "document", "photo", "sticker", "animation", "video", "voice", "video_note",
+                           "new_chat_photo")
+
+        if isinstance(message, types.Message):
+            for kind in available_media:
+                media = getattr(message, kind, None)
+
+                if media is not None:
+                    break
+            else:
+                raise ValueError("This message doesn't contain any downloadable media")
+        else:
+            media = message
+
+        if isinstance(media, str):
+            file_id_str = media
+        else:
+            file_id_str = media.file_id
+
+        file_id_obj = FileId.decode(file_id_str)
+
+        media_file_name = getattr(media, "file_name", "")
+        file_size = getattr(media, "file_size", 0)
+
+        return self.get_streaming_file(file_id_obj, file_size, progress, progress_args)
