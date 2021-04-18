@@ -37,6 +37,8 @@ class Scaffold:
     DEVICE_MODEL = f"{platform.python_implementation()} {platform.python_version()}"
     SYSTEM_VERSION = f"{platform.system()} {platform.release()}"
 
+    TEST_MODE = False
+
     LANG_CODE = "en"
 
     PARENT_DIR = Path(sys.argv[0]).parent

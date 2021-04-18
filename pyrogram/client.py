@@ -648,7 +648,7 @@ class Client(Methods, Scaffold):
             else:
                 raise AttributeError("No API Key found. More info: https://docs.pyrogram.org/intro/setup")
 
-        for option in ["app_version", "device_model", "system_version", "lang_code"]:
+        for option in ["app_version", "device_model", "system_version", "lang_code", "test_mode"]:
             if getattr(self, option):
                 pass
             else:
