@@ -20,7 +20,7 @@ import base64
 import json
 import logging
 import os
-import sqlite3
+import aiosqlite
 from pathlib import Path
 
 from .sqlite_storage import SQLiteStorage
@@ -36,15 +36,15 @@ class FileStorage(SQLiteStorage):
 
         self.database = workdir / (self.name + self.FILE_EXTENSION)
 
-    def migrate_from_json(self, session_json: dict):
-        self.open()
+    async def migrate_from_json(self, session_json: dict):
+        await self.open()
 
-        self.dc_id(session_json["dc_id"])
-        self.test_mode(session_json["test_mode"])
-        self.auth_key(base64.b64decode("".join(session_json["auth_key"])))
-        self.user_id(session_json["user_id"])
-        self.date(session_json.get("date", 0))
-        self.is_bot(session_json.get("is_bot", False))
+        await self.dc_id(session_json["dc_id"])
+        await self.test_mode(session_json["test_mode"])
+        await self.auth_key(base64.b64decode("".join(session_json["auth_key"])))
+        await self.user_id(session_json["user_id"])
+        await self.date(session_json.get("date", 0))
+        await self.is_bot(session_json.get("is_bot", False))
 
         peers_by_id = session_json.get("peers_by_id", {})
         peers_by_phone = session_json.get("peers_by_phone", {})
@@ -65,18 +65,17 @@ class FileStorage(SQLiteStorage):
             peers[v][4] = k
 
         # noinspection PyTypeChecker
-        self.update_peers(peers.values())
+        await self.update_peers(peers.values())
 
-    def update(self):
-        version = self.version()
+    async def update(self):
+        version = await self.version()
 
         if version == 1:
-            with self.lock, self.conn:
-                self.conn.execute("DELETE FROM peers")
+            await self.conn.execute("DELETE FROM peers")
 
             version += 1
 
-        self.version(version)
+        await self.version(version)
 
     async def open(self):
         path = self.database
@@ -95,7 +94,7 @@ class FileStorage(SQLiteStorage):
 
                 log.warning(f'The old session file has been renamed to "{path.name}.OLD"')
 
-                self.migrate_from_json(session_json)
+                await self.migrate_from_json(session_json)
 
                 log.warning("Done! The session has been successfully converted from JSON to SQLite storage")
 
@@ -104,18 +103,19 @@ class FileStorage(SQLiteStorage):
         if Path(path.name + ".OLD").is_file():
             log.warning(f'Old session file detected: "{path.name}.OLD". You can remove this file now')
 
-        self.conn = sqlite3.connect(str(path), timeout=1, check_same_thread=False)
+        self.conn = await aiosqlite.connect(str(path), timeout=1)
+
+        await self.conn.execute("PRAGMA journal_mode=WAL")
 
         if not file_exists:
-            self.create()
+            await self.create()
         else:
-            self.update()
+            await self.update()
 
-        with self.conn:
-            try:  # Python 3.6.0 (exactly this version) is bugged and won't successfully execute the vacuum
-                self.conn.execute("VACUUM")
-            except sqlite3.OperationalError:
-                pass
+        try:  # Python 3.6.0 (exactly this version) is bugged and won't successfully execute the vacuum
+            await self.conn.execute("VACUUM")
+        except aiosqlite.OperationalError:
+            pass
 
     async def delete(self):
         os.remove(self.database)
