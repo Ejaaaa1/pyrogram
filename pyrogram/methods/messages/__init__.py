@@ -63,6 +63,8 @@ from .send_voice import SendVoice
 from .stop_poll import StopPoll
 from .stream_media import StreamMedia
 from .vote_poll import VotePoll
+from .wait_for_message import WaitForMessage
+from .wait_for_callback_query import WaitForCallbackQuery
 
 
 class Messages(
@@ -112,6 +114,8 @@ class Messages(
     SendReaction,
     GetDiscussionReplies,
     GetDiscussionRepliesCount,
-    StreamMedia
+    StreamMedia,
+    WaitForMessage,
+    WaitForCallbackQuery
 ):
     pass
