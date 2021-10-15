@@ -63,3 +63,8 @@ class CDNFileHashMismatch(SecurityError):
 
     def __init__(self):
         super().__init__("A CDN file hash mismatch has occurred.")
+
+
+class ListenerCanceled(Exception):
+    """Raised when a Pyromod listener is canceled."""
+    pass
